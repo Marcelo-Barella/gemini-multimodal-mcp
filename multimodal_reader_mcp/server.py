@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 from multimodal_reader_mcp.uploads import get_or_upload_media_reference
 
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL_ENV_VAR = "MULTIMODAL_READER_MODEL"
+FALLBACK_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = os.environ.get(DEFAULT_MODEL_ENV_VAR, FALLBACK_MODEL)
 
 
 class ConfidenceLevel(StrEnum):
