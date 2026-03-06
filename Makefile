@@ -1,4 +1,4 @@
-.PHONY: init install run build publish clean
+.PHONY: init install run test lint build publish clean
 
 DIST_DIR := dist
 
@@ -10,6 +10,12 @@ install: init
 
 run: init
 	@uv run multimodal-reader-mcp
+
+test: init
+	@uv run -m pytest
+
+lint: init
+	@uv run ruff check .
 
 build: init
 	@rm -rf $(DIST_DIR)

@@ -25,8 +25,6 @@ You can override the default model for all requests by setting:
 
 - `MULTIMODAL_READER_MODEL`
 
-Users can also still pass `model` directly to the `read_media` tool call.
-
 
 ## MCP client configuration
 
@@ -51,7 +49,7 @@ Example Cursor MCP config:
 
 The package exposes one MCP tool:
 
-- `read_media(file_path, question=None, model="gemini-2.5-flash")`
+- `read_media(file_path, question=None)`
 
 `file_path` must be an absolute path to a local media file.
 

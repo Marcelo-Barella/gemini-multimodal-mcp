@@ -143,9 +143,9 @@ def _analyze_media(
 def read_media(
     file_path: str,
     question: str | None = None,
-    model: str = DEFAULT_MODEL,
 ) -> MediaAnalysisResult:
     """Read a local audio or video file and return structured analysis."""
+    model = DEFAULT_MODEL
     resolved_path = _resolve_file_path(file_path)
     resolved_mime_type = _detect_mime_type(resolved_path)
     generated_analysis = _analyze_media(
