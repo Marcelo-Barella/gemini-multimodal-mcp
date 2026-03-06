@@ -1,0 +1,13 @@
+[project]
+name = "multimodal-reader"
+version = "0.1.0"
+description = "FastMCP server for reading local audio and video files with Google Gen AI."
+requires-python = ">=3.14"
+dependencies = [
+    "google-genai>=1.66.0",
+    "mcp>=1.26.0",
+    "pydantic>=2.12.5",
+]
+
+[project.scripts]
+multimodal-reader-mcp = "multimodal_reader_mcp.server:main"
