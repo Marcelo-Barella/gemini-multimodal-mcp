@@ -52,9 +52,9 @@ mcp = FastMCP("multimodal-reader")
 
 def _require_api_key() -> str:
     try:
-        return os.environ["GEMINI_API_KEY"]
+        return os.environ["GOOGLE_API_KEY"]
     except KeyError as error:
-        raise EnvironmentError("GEMINI_API_KEY is not set.") from error
+        raise EnvironmentError("GOOGLE_API_KEY is not set.") from error
 
 
 def _resolve_file_path(file_path: str) -> Path:
