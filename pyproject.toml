@@ -1,13 +1,33 @@
 [project]
-name = "multimodal-reader"
+name = "multimodal-reader-mcp"
 version = "0.1.0"
 description = "FastMCP server for reading local audio and video files with Google Gen AI."
+readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "google-genai>=1.66.0",
     "mcp>=1.26.0",
     "pydantic>=2.12.5",
 ]
+keywords = ["mcp", "multimodal", "audio", "video", "gemini", "cursor"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 
 [project.scripts]
 multimodal-reader-mcp = "multimodal_reader_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["multimodal_reader_mcp"]

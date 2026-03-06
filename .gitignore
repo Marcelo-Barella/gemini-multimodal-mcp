@@ -1,3 +1,6 @@
 .venv
 .idea
 .cursor
+__pycache__/
+dist/
+*.egg-info/
