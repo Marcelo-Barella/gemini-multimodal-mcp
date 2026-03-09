@@ -26,6 +26,7 @@ All standard dev commands are in the `Makefile`:
 
 ### Gotchas
 
-- The server runs over **stdio** (not HTTP). To test it, pipe JSON-RPC messages into it: `echo '{"jsonrpc":"2.0","id":1,"method":"initialize",...}' | GOOGLE_API_KEY=dummy uv run multimodal-reader-mcp`.
+- The server runs over **stdio** (not HTTP). To test it manually, pipe newline-delimited JSON-RPC messages. The MCP handshake requires three messages in order: `initialize`, `notifications/initialized`, then `tools/call`. Example: `printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"0.1"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"read_media","arguments":{"file_path":"/tmp/test.wav"}}}\n' | uv run multimodal-reader-mcp`.
 - Tests pass without `GOOGLE_API_KEY` because all Gemini calls are mocked.
 - `MULTIMODAL_READER_MODEL` env var optionally overrides the default Gemini model (`gemini-2.5-flash`).
+- Gemini file uploads use a SHA-256-based name for deduplication; re-uploading the same file reuses the existing remote reference.
