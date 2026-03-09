@@ -8,6 +8,8 @@ from google.genai import types
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
+from multimodal_reader_mcp.downloads import download_to_tempfile
+from multimodal_reader_mcp.notion import extract_media_references, resolve_attachment_url
 from multimodal_reader_mcp.uploads import get_or_upload_media_reference
 
 
@@ -47,6 +49,29 @@ class MediaAnalysisResult(BaseModel):
     relevant_clues: list[str] = Field(description="Details most relevant to the user's question or likely follow-up tasks.")
     open_questions: list[str] = Field(description="Uncertainties or missing evidence.")
     confidence: ConfidenceLevel = Field(description="Confidence in the analysis based on media quality and clarity.")
+
+
+NOTION_TOKEN_ENV_VAR = "NOTION_TOKEN"
+
+
+class NotionMediaEntry(BaseModel):
+    source_url: str = Field(description="Original URL from the Notion markdown.")
+    media_type: str = Field(description="Type of media: video or audio.")
+    caption: str = Field(description="Caption text from the media block.")
+    is_notion_attachment: bool = Field(description="Whether this is a Notion-hosted attachment file.")
+    download_url: str | None = Field(description="Resolved HTTP URL used for download.")
+    analysis: GeneratedMediaAnalysis | None = Field(description="Gemini analysis result, if successful.")
+    error: str | None = Field(description="Error message if download or analysis failed.")
+
+
+class NotionPageMediaAnalysis(BaseModel):
+    page_title: str | None = Field(description="Title of the Notion page.")
+    page_url: str | None = Field(description="URL of the Notion page.")
+    model: str = Field(description="Gemini model used for analysis.")
+    question: str | None = Field(description="Optional user question that guided the analysis.")
+    media_found: int = Field(description="Total number of media blocks found on the page.")
+    media_analyzed: int = Field(description="Number of media blocks successfully analyzed.")
+    entries: list[NotionMediaEntry] = Field(description="Per-media analysis entries.")
 
 
 mcp = FastMCP("multimodal-reader")
@@ -168,6 +193,134 @@ def read_media(
         relevant_clues=generated_analysis.relevant_clues,
         open_questions=generated_analysis.open_questions,
         confidence=generated_analysis.confidence,
+    )
+
+
+def _analyze_and_build_entry(
+    *,
+    download_url: str,
+    source_url: str,
+    media_type: str,
+    caption: str,
+    is_notion_attachment: bool,
+    filename_hint: str | None,
+    question: str | None,
+    model: str,
+) -> NotionMediaEntry:
+    downloaded = download_to_tempfile(download_url, filename_hint=filename_hint)
+    try:
+        generated = _analyze_media(
+            file_path=downloaded.file_path,
+            mime_type=downloaded.mime_type,
+            question=question,
+            model=model,
+        )
+    finally:
+        downloaded.file_path.unlink(missing_ok=True)
+    return NotionMediaEntry(
+        source_url=source_url,
+        media_type=media_type,
+        caption=caption,
+        is_notion_attachment=is_notion_attachment,
+        download_url=download_url,
+        analysis=generated,
+        error=None,
+    )
+
+
+@mcp.tool()
+def read_notion_page_media(
+    notion_markdown: str,
+    question: str | None = None,
+    page_title: str | None = None,
+    page_url: str | None = None,
+) -> NotionPageMediaAnalysis:
+    """Analyze all video and audio media embedded in a Notion page.
+
+    Accepts the enhanced Markdown output from notion-fetch.
+    Extracts video and audio blocks, downloads the media files,
+    and returns structured Gemini analysis for each.
+    Set NOTION_TOKEN env var to enable Notion attachment file resolution.
+    """
+    model = DEFAULT_MODEL
+    notion_token = os.environ.get(NOTION_TOKEN_ENV_VAR)
+    references = extract_media_references(notion_markdown)
+    entries: list[NotionMediaEntry] = []
+    analyzed_count = 0
+
+    for ref in references:
+        download_url = ref.download_url
+        if ref.is_notion_attachment and download_url is None:
+            if notion_token and ref.attachment_block_id:
+                try:
+                    download_url = resolve_attachment_url(ref.attachment_block_id, notion_token)
+                except Exception as exc:
+                    entries.append(NotionMediaEntry(
+                        source_url=ref.source_url,
+                        media_type=ref.media_type,
+                        caption=ref.caption,
+                        is_notion_attachment=True,
+                        download_url=None,
+                        analysis=None,
+                        error=f"Failed to resolve Notion attachment URL: {exc}",
+                    ))
+                    continue
+            else:
+                entries.append(NotionMediaEntry(
+                    source_url=ref.source_url,
+                    media_type=ref.media_type,
+                    caption=ref.caption,
+                    is_notion_attachment=True,
+                    download_url=None,
+                    analysis=None,
+                    error="NOTION_TOKEN env var is required to download Notion attachment files.",
+                ))
+                continue
+
+        if download_url is None:
+            entries.append(NotionMediaEntry(
+                source_url=ref.source_url,
+                media_type=ref.media_type,
+                caption=ref.caption,
+                is_notion_attachment=ref.is_notion_attachment,
+                download_url=None,
+                analysis=None,
+                error="No downloadable URL available for this media.",
+            ))
+            continue
+
+        try:
+            entry = _analyze_and_build_entry(
+                download_url=download_url,
+                source_url=ref.source_url,
+                media_type=ref.media_type,
+                caption=ref.caption,
+                is_notion_attachment=ref.is_notion_attachment,
+                filename_hint=ref.attachment_filename,
+                question=question,
+                model=model,
+            )
+            entries.append(entry)
+            analyzed_count += 1
+        except Exception as exc:
+            entries.append(NotionMediaEntry(
+                source_url=ref.source_url,
+                media_type=ref.media_type,
+                caption=ref.caption,
+                is_notion_attachment=ref.is_notion_attachment,
+                download_url=download_url,
+                analysis=None,
+                error=f"Failed to download or analyze media: {exc}",
+            ))
+
+    return NotionPageMediaAnalysis(
+        page_title=page_title,
+        page_url=page_url,
+        model=model,
+        question=question,
+        media_found=len(references),
+        media_analyzed=analyzed_count,
+        entries=entries,
     )
 
 
